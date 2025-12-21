@@ -957,3 +957,12 @@ void Client::WorldMap()
 	wordMapY = (m_nGameHeight - 524) / 2;
 	Memory::CodeCave(wordMapUIcc, 0x009EB594, 13);
 }
+
+void Client::ApplyDeleteCharPatch() {
+	unsigned char patchData[] = {
+		0x80, 0xBE, 0x74, 0x01, 0x00, 0x00, 0x00, // CMP BYTE PTR [ESI+0x174], 00
+		0x75, 0x19,                               // JNZ 0x19
+		0x90, 0x90, 0x90, 0x90                    // NOP
+	};
+	Memory::WriteByteArray(0x005F7C9B, patchData, sizeof(patchData));
+}
