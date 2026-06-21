@@ -682,7 +682,7 @@ HRESULT STDMETHODCALLTYPE Direct3DDevice8::EndScene()
 		ImGui::CreateContext();
 		ImGuiIO& io = ImGui::GetIO();
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-		io.MouseDrawCursor = true;
+		io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
 
 		// Load Chinese font to prevent ????
 		ImFontConfig fontConfig;
