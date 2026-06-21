@@ -389,11 +389,11 @@ void UpdateSetPanelData(void* pToolTip, void* pEquip) {
     }
 
     // If set panel is already active and updated recently in the same frame,
-    // only keep the one with the larger X coordinate (the hovered tooltip on the right),
+    // only keep the one with the larger WIDTH (the main tooltip, not the native set item window),
     // UNLESS we are updating the exact same tooltip, then we must always update coordinates to prevent lagging.
     if (g_SetPanelData.active && (GetTickCount() - g_SetPanelData.lastUpdated < 100)) {
         if (g_SetPanelData.pToolTip != pToolTip) {
-            if (nativeX < g_SetPanelData.nativeX) {
+            if (nativeWidth <= g_SetPanelData.nativeWidth) {
                 return;
             }
         }
@@ -484,20 +484,31 @@ void DrawSetItemImGui() {
     float finalY = 0;
     
     if (g_SetPanelData.nativeX != -1 && g_SetPanelData.nativeY != -1) {
-        // User requested: "統一右邊" (Uniformly on the right) and "上面是對齊的" (Top is aligned)
-        // Place on the right side of the native tooltip
-        finalX = (float)(g_SetPanelData.nativeX + g_SetPanelData.nativeWidth);
-        // If it goes off-screen to the right, draw on the left side
-        if (finalX + myWidth > screenW) {
+        // Expand outward from mouse cursor
+        float nativeCenterX = g_SetPanelData.nativeX + (g_SetPanelData.nativeWidth * 0.5f);
+        if (nativeCenterX < mousePos.x) {
+            // Native tooltip is on the left of the mouse, so place our panel on its LEFT side
             finalX = (float)(g_SetPanelData.nativeX - myWidth);
+            // If it goes off-screen to the left, try right side as fallback
+            if (finalX < 0) {
+                finalX = (float)(g_SetPanelData.nativeX + g_SetPanelData.nativeWidth);
+            }
+        } else {
+            // Native tooltip is on the right of the mouse, so place our panel on its RIGHT side
+            finalX = (float)(g_SetPanelData.nativeX + g_SetPanelData.nativeWidth);
+            // If it goes off-screen to the right, try left side as fallback
+            if (finalX + myWidth > screenW) {
+                finalX = (float)(g_SetPanelData.nativeX - myWidth);
+            }
         }
+        
         // Perfect top alignment
         finalY = (float)g_SetPanelData.nativeY;
     } else {
         // Fallback if extraction failed
         finalX = mousePos.x - myWidth - 10.0f;
         if (finalX < 0) {
-            finalX = mousePos.x + 200.0f;
+            finalX = mousePos.x + 20.0f;
         }
         finalY = mousePos.y + 12.0f;
     }
