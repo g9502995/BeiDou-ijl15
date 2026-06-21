@@ -1,4 +1,4 @@
-﻿// dllmain.cpp : Defines the entry point for the DLL application.
+// dllmain.cpp : Defines the entry point for the DLL application.
 #include "stdafx.h"
 #include "NMCO.h"
 #include "ijl15.h"
@@ -8,7 +8,22 @@
 #include "BossHP.h"
 #include "HpMpAlert.h"
 #include "SelectCharMacFix.h"
+#include "WebHook.h"
+#include "TooltipHook.h"
+#include "D3DHook.h"
+#include "SetItemPanel.h"
 #pragma comment(lib, "ws2_32.lib")
+
+DWORD WINAPI SetItemInitThread(LPVOID lpParam) {
+	// Loop safely until game allocates WzResMan
+	void** ppResMan = reinterpret_cast<void**>(0x00BF14E8);
+	while (ppResMan == NULL || *ppResMan == NULL) {
+		Sleep(500); 
+	}
+	Sleep(1000); // Give the game an extra second to load properties
+	LoadSetItemInfo();
+	return 0;
+}
 
 // config.ini can use IP or hostname (ServerIP_Address=...).
 // The patch expects an IPv4 dotted string; resolve hostnames to IPv4.
@@ -64,7 +79,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 	switch (ul_reason_for_call) {
 	case DLL_PROCESS_ATTACH:
 	{
-		//CreateConsole();	//console for devs, use this to log stuff if you want
+		CreateConsole();	//console for devs, use this to log stuff if you want
 		INIReader reader("config.ini");
 		if (reader.ParseError() == 0) {
 			Client::m_nGameWidth = reader.GetInteger("general", "width", 1280);
@@ -115,6 +130,9 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 		HookSaveGlobal(true);
 		HookHpMpAlertRecv(true);
 		HookSelectCharMacFix(true);
+		Hook_OnOpenFullClientDownloadLink(true);
+		InitTooltipHooks();
+		InitD3DHook();
 		//Hook_get_unknown(true);
 		//Hook_get_resource_object(true); //helper function hooks  //ty teto for helping me get started
 		//Hook_com_ptr_t_IWzProperty__ctor(true);
@@ -140,6 +158,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 		Client::DeleteChar();
 		std::cout << "GetModuleFileName hook created" << std::endl;
 		ijl15::CreateHook(); //NMCO::CreateHook();
+
+		CreateThread(NULL, 0, SetItemInitThread, NULL, 0, NULL);
 
 		std::cout << "NMCO hook initialized" << std::endl;
 		break;
