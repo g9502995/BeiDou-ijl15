@@ -367,13 +367,24 @@ void UpdateSetPanelData(void* pToolTip, void* pEquip) {
     int nativeWidth = 236;
 
     if (pToolTip) {
-        nativeX = *reinterpret_cast<int*>(reinterpret_cast<char*>(pToolTip) + 0x14);
-        nativeY = *reinterpret_cast<int*>(reinterpret_cast<char*>(pToolTip) + 0x18);
-        int width = *reinterpret_cast<int*>(reinterpret_cast<char*>(pToolTip) + 0x0C);
-        if (width >= 150 && width <= 500) {
-            nativeWidth = width;
+        int extX = *reinterpret_cast<int*>(reinterpret_cast<char*>(pToolTip) + 0x14);
+        int extY = *reinterpret_cast<int*>(reinterpret_cast<char*>(pToolTip) + 0x18);
+        int extRight = *reinterpret_cast<int*>(reinterpret_cast<char*>(pToolTip) + 0x1C);
+        
+        // Sanity check coordinates to prevent flying off screen (e.g. from broadcast tooltips which have different memory layout)
+        if (extX >= -500 && extX <= 4000 && extY >= -500 && extY <= 4000) {
+            nativeX = extX;
+            nativeY = extY;
+            
+            int calculatedWidth = extRight - extX;
+            if (calculatedWidth >= 150 && calculatedWidth <= 600) {
+                nativeWidth = calculatedWidth;
+            } else {
+                nativeWidth = 236; // Default width fallback
+            }
         } else {
-            nativeWidth = 236;
+            nativeX = -1;
+            nativeY = -1;
         }
     }
 
