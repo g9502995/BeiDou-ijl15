@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS
+﻿#define _CRT_SECURE_NO_WARNINGS
 #include "stdafx.h"
 #include "SetItemPanel.h"
 #include "vendor/imgui/imgui.h"
@@ -333,6 +333,34 @@ void LoadSetItemInfo() {
     std::cout << "[SetItem] Loaded " << setsLoaded << " sets from Etc/SetItemInfo.img successfully!" << std::endl;
 }
 
+// Helper function to safely extract coordinates using SEH, avoiding C2712
+static bool TryGetAbsolutePosition(void* pToolTip, int& outX, int& outY, int& outWidth, int& outHeight) {
+    if (!pToolTip) return false;
+    __try {
+        if (IsBadReadPtr(pToolTip, 0x30)) {
+            return false;
+        }
+
+        // Offsets 0x14 and 0x18 store the client coordinates of the tooltip window (the cursor position)
+        int clientX = *reinterpret_cast<int*>(reinterpret_cast<char*>(pToolTip) + 0x14);
+        int clientY = *reinterpret_cast<int*>(reinterpret_cast<char*>(pToolTip) + 0x18);
+        
+        // Read width and height from known offsets
+        int w = *reinterpret_cast<int*>(reinterpret_cast<char*>(pToolTip) + 0x24);
+        int h = *reinterpret_cast<int*>(reinterpret_cast<char*>(pToolTip) + 0x28);
+
+        if (clientX >= -2000 && clientX <= 8000 && clientY >= -2000 && clientY <= 8000) {
+            outX = clientX;
+            outY = clientY;
+            outWidth = (w >= 50 && w <= 800) ? w : 236;
+            outHeight = (h >= 50 && h <= 1500) ? h : 0;
+            return true;
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        // Catch any unexpected access violations
+    }
+    return false;
+}
 
 void UpdateSetPanelData(void* pToolTip, void* pEquip) {
     if (!pEquip || reinterpret_cast<uintptr_t>(pEquip) < 0x10000) return;
@@ -356,7 +384,9 @@ void UpdateSetPanelData(void* pToolTip, void* pEquip) {
     int setID = itSetID->second;
     auto itInfo = g_SetInfos.find(setID);
     if (itInfo == g_SetInfos.end()) {
-        g_SetPanelData.active = false;
+        if (g_SetPanelData.pToolTip == pToolTip) {
+            g_SetPanelData.active = false;
+        }
         return;
     }
 
@@ -365,64 +395,60 @@ void UpdateSetPanelData(void* pToolTip, void* pEquip) {
     int nativeX = -1;
     int nativeY = -1;
     int nativeWidth = 236;
+    int nativeHeight = 0;
 
-    if (pToolTip) {
-        // Calculate absolute position by traversing CWnd parent hierarchy
-        int absX = 0;
-        int absY = 0;
-        void* curr = pToolTip;
-        int depth = 0;
-        
-        while (curr != nullptr && depth < 10) {
-            // Read local X and Y
-            int localX = *reinterpret_cast<int*>(reinterpret_cast<char*>(curr) + 0x14);
-            int localY = *reinterpret_cast<int*>(reinterpret_cast<char*>(curr) + 0x18);
-            
-            // Avoid adding garbage if a parent is somehow invalid
-            if (localX > -5000 && localX < 5000 && localY > -5000 && localY < 5000) {
-                absX += localX;
-                absY += localY;
-            }
-            
-            // Move to parent (CWnd* m_pParent is at 0x04)
-            curr = *reinterpret_cast<void**>(reinterpret_cast<char*>(curr) + 0x04);
-            depth++;
+    if (!TryGetAbsolutePosition(pToolTip, nativeX, nativeY, nativeWidth, nativeHeight)) {
+        nativeX = -1;
+        nativeY = -1;
+        nativeWidth = 236;
+        nativeHeight = 0;
+    }
+
+    POINT pt;
+    GetCursorPos(&pt);
+    HWND hwnd = (HWND)ImGui::GetMainViewport()->PlatformHandleRaw;
+    if (hwnd) {
+        ScreenToClient(hwnd, &pt);
+    }
+
+    float dx = (float)pt.x - ((float)nativeX + (float)nativeWidth * 0.5f);
+    float dy = (float)pt.y - ((float)nativeY + 150.0f);
+    float dist = dx * dx + dy * dy;
+
+    if (nativeX == -1) {
+        dist = 999999.0f; // Fallback if position failed
+    }
+
+    // Check if we should override the active tooltip
+    bool shouldOverride = false;
+    if (!g_SetPanelData.active || g_SetPanelData.pToolTip == pToolTip) {
+        shouldOverride = true;
+    } else {
+        // Active tooltip is different. Compare distance to current mouse position.
+        float activeDist = 999999.0f;
+        if (g_SetPanelData.nativeX != -1) {
+            float adx = (float)pt.x - ((float)g_SetPanelData.nativeX + (float)g_SetPanelData.nativeWidth * 0.5f);
+            float ady = (float)pt.y - ((float)g_SetPanelData.nativeY + 150.0f);
+            activeDist = adx * adx + ady * ady;
         }
-
-        int localRight = *reinterpret_cast<int*>(reinterpret_cast<char*>(pToolTip) + 0x1C);
-        int localLeft = *reinterpret_cast<int*>(reinterpret_cast<char*>(pToolTip) + 0x14);
-        
-        // Sanity check coordinates
-        if (absX >= -500 && absX <= 4000 && absY >= -500 && absY <= 4000) {
-            nativeX = absX;
-            nativeY = absY;
-            
-            int calculatedWidth = localRight - localLeft;
-            if (calculatedWidth >= 150 && calculatedWidth <= 600) {
-                nativeWidth = calculatedWidth;
-            } else {
-                nativeWidth = 236; // Default width fallback
-            }
-        } else {
-            nativeX = -1;
-            nativeY = -1;
+        if (dist < activeDist) {
+            shouldOverride = true;
         }
     }
 
-    // If set panel is already active and updated recently in the same frame,
-    // only keep the one with the larger WIDTH (the main tooltip, not the native set item window),
-    // UNLESS we are updating the exact same tooltip, then we must always update coordinates to prevent lagging.
-    if (g_SetPanelData.active && (GetTickCount() - g_SetPanelData.lastUpdated < 100)) {
-        if (g_SetPanelData.pToolTip != pToolTip) {
-            if (nativeWidth <= g_SetPanelData.nativeWidth) {
-                return;
-            }
-        }
+    if (!shouldOverride) {
+        return;
     }
 
-    if (!g_SetPanelData.active || g_SetPanelData.pToolTip != pToolTip) {
-        POINT pt;
-        GetCursorPos(&pt);
+    bool isNewToolTip = (!g_SetPanelData.active || g_SetPanelData.pToolTip != pToolTip || g_SetPanelData.pEquip != pEquip);
+    if (isNewToolTip) {
+        std::cout << "[SetItem] Tooltip active: pToolTip=" << pToolTip 
+                  << ", ItemID=" << itemID 
+                  << ", SetName=" << WStringToString(info.setName)
+                  << ", dist=" << dist 
+                  << ", nativeX=" << nativeX 
+                  << ", nativeY=" << nativeY 
+                  << ", nativeWidth=" << nativeWidth << std::endl;
         g_SetPanelData.startMouseX = (float)pt.x;
         g_SetPanelData.startMouseY = (float)pt.y;
     }
@@ -430,10 +456,10 @@ void UpdateSetPanelData(void* pToolTip, void* pEquip) {
     g_SetPanelData.pToolTip = pToolTip;
     g_SetPanelData.pEquip = pEquip;
     g_SetPanelData.setName = WStringToString(info.setName);
-    g_SetPanelData.hideFrameCount = 0;
     g_SetPanelData.nativeX = nativeX;
     g_SetPanelData.nativeY = nativeY;
     g_SetPanelData.nativeWidth = nativeWidth;
+    g_SetPanelData.nativeHeight = nativeHeight;
 
     if (info.itemIDs.empty()) return;
     g_SetPanelData.items.clear();
@@ -486,9 +512,7 @@ void UpdateSetPanelData(void* pToolTip, void* pEquip) {
 }
 
 void ClearSetPanelData(void* pToolTip) {
-    std::lock_guard<std::mutex> lock(g_SetPanelMutex);
-    if (g_SetPanelData.pToolTip != pToolTip) return;
-    g_SetPanelData.active = false;
+    // No-op. We rely on the 0x1C visibility check in DrawSetItemImGui.
 }
 
 void DrawTextWithShadow(const char* text, ImVec4 color) {
@@ -499,41 +523,107 @@ void DrawTextWithShadow(const char* text, ImVec4 color) {
     ImGui::TextColored(color, "%s", text);
 }
 
+static int GetCWndVisibleSafe(void* pToolTip) {
+    if (!pToolTip) return 0;
+    __try {
+        if (!IsBadReadPtr(pToolTip, 0x30)) {
+            // Offset 0x1C is m_bVisible in CWnd
+            return *reinterpret_cast<int*>(reinterpret_cast<char*>(pToolTip) + 0x1C);
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+    return 0;
+}
+
 void DrawSetItemImGui() {
     std::lock_guard<std::mutex> lock(g_SetPanelMutex);
+
+    // Check if the tooltip is still active and visible
+    bool isVisible = false;
+    if (g_SetPanelData.active && g_SetPanelData.pToolTip) {
+        DWORD elapsed = GetTickCount() - g_SetPanelData.lastUpdated;
+        if (elapsed <= 120) {
+            isVisible = true;
+        } else {
+            int visibleFlag = GetCWndVisibleSafe(g_SetPanelData.pToolTip);
+            if (visibleFlag != 0) {
+                // Check if mouse is still reasonably close to the tooltip
+                ImVec2 mousePos = ImGui::GetIO().MousePos;
+                float maxDist = 250000.0f; // ~500 pixels radius
+                if (g_SetPanelData.nativeX != -1 && g_SetPanelData.nativeY != -1) {
+                    float dx = (float)mousePos.x - ((float)g_SetPanelData.nativeX + (float)g_SetPanelData.nativeWidth * 0.5f);
+                    float dy = (float)mousePos.y - ((float)g_SetPanelData.nativeY + 150.0f);
+                    float dist = dx * dx + dy * dy;
+                    if (dist < maxDist) {
+                        isVisible = true;
+                    }
+                } else {
+                    isVisible = true; // Fallback if coordinate extraction failed
+                }
+            }
+        }
+    }
+
+    if (!isVisible) {
+        g_SetPanelData.active = false;
+    }
+
+    static bool s_LastActive = false;
+    if (g_SetPanelData.active != s_LastActive) {
+        std::cout << "[SetItem] Panel active state changed: " << (g_SetPanelData.active ? "TRUE" : "FALSE") 
+                  << " (elapsed=" << (GetTickCount() - g_SetPanelData.lastUpdated) 
+                  << "ms, pToolTip=" << g_SetPanelData.pToolTip << ")" << std::endl;
+        s_LastActive = g_SetPanelData.active;
+    }
 
     if (!g_SetPanelData.active) return;
 
     ImVec2 mousePos = ImGui::GetIO().MousePos;
     float screenW = ImGui::GetIO().DisplaySize.x;
+    float screenH = ImGui::GetIO().DisplaySize.y;
 
     float myWidth = 260.0f;
     float finalX = 0;
     float finalY = 0;
     
     if (g_SetPanelData.nativeX != -1 && g_SetPanelData.nativeY != -1) {
+        // Apply the same right-boundary clamping that v83 SetToolTip_Equip2 uses
+        int clampedNativeX = g_SetPanelData.nativeX;
+        if (screenW > 0 && clampedNativeX + g_SetPanelData.nativeWidth > (int)screenW) {
+            clampedNativeX = (int)screenW - g_SetPanelData.nativeWidth;
+            if (clampedNativeX < 0) clampedNativeX = 0;
+        }
+
         // Expand outward from mouse cursor
-        float nativeCenterX = g_SetPanelData.nativeX + (g_SetPanelData.nativeWidth * 0.5f);
+        float nativeCenterX = clampedNativeX + (g_SetPanelData.nativeWidth * 0.5f);
         const float TOOLTIP_MARGIN_X = 13.0f; // Native tooltip border/shadow padding
         
         if (nativeCenterX < mousePos.x) {
             // Native tooltip is on the left of the mouse, so place our panel on its LEFT side
-            finalX = (float)(g_SetPanelData.nativeX - TOOLTIP_MARGIN_X - myWidth);
+            finalX = (float)(clampedNativeX - TOOLTIP_MARGIN_X - myWidth);
             // If it goes off-screen to the left, try right side as fallback
             if (finalX < 0) {
-                finalX = (float)(g_SetPanelData.nativeX + g_SetPanelData.nativeWidth + TOOLTIP_MARGIN_X);
+                finalX = (float)(clampedNativeX + g_SetPanelData.nativeWidth + TOOLTIP_MARGIN_X);
             }
         } else {
             // Native tooltip is on the right of the mouse, so place our panel on its RIGHT side
-            finalX = (float)(g_SetPanelData.nativeX + g_SetPanelData.nativeWidth + TOOLTIP_MARGIN_X);
+            finalX = (float)(clampedNativeX + g_SetPanelData.nativeWidth + TOOLTIP_MARGIN_X);
             // If it goes off-screen to the right, try left side as fallback
             if (finalX + myWidth > screenW) {
-                finalX = (float)(g_SetPanelData.nativeX - TOOLTIP_MARGIN_X - myWidth);
+                finalX = (float)(clampedNativeX - TOOLTIP_MARGIN_X - myWidth);
             }
         }
-        
-        // Perfect top alignment
-        finalY = (float)g_SetPanelData.nativeY;
+
+        // Apply perfect Y clamping using the exact native tooltip height (from offset 0x28)
+        int clampedNativeY = g_SetPanelData.nativeY;
+        if (g_SetPanelData.nativeHeight > 0) {
+            if (screenH > 0 && clampedNativeY + g_SetPanelData.nativeHeight > screenH) {
+                clampedNativeY = screenH - g_SetPanelData.nativeHeight;
+                if (clampedNativeY < 0) clampedNativeY = 0;
+            }
+        }
+
+        // Perfect top alignment initially
+        finalY = (float)clampedNativeY;
     } else {
         // Fallback if extraction failed - stick to the initial mouse position, do not follow the mouse!
         finalX = g_SetPanelData.startMouseX - myWidth - 10.0f;
@@ -541,6 +631,14 @@ void DrawSetItemImGui() {
             finalX = g_SetPanelData.startMouseX + 20.0f;
         }
         finalY = g_SetPanelData.startMouseY + 12.0f;
+    }
+
+    // Ensure our own ImGui panel doesn't go off-screen at the bottom
+    static float s_lastWindowHeight = 0.0f;
+    float myHeight = s_lastWindowHeight > 0.0f ? s_lastWindowHeight : 200.0f;
+    if (screenH > 0 && finalY + myHeight > screenH) {
+        finalY = screenH - myHeight;
+        if (finalY < 0) finalY = 0;
     }
 
     ImGui::SetNextWindowPos(ImVec2(finalX, finalY), ImGuiCond_Always);
@@ -553,10 +651,10 @@ void DrawSetItemImGui() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 8.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 4.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
-    
+
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | 
                              ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | 
-                             ImGuiWindowFlags_AlwaysAutoResize;
+                             ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoInputs;
 
     if (ImGui::Begin("##SetItemPanel", nullptr, flags)) {
         ImVec4 titleColor(0.2f, 1.0f, 0.2f, 1.0f); // Bright green
@@ -592,9 +690,9 @@ void DrawSetItemImGui() {
         ImGui::Separator();
         ImGui::Dummy(ImVec2(0, 2));
 
-        std::string setEffectStr = WStringToString(L"%d \u4ef6\u5957\u6548\u679c\uff1a"); // %d 件套效果：
-        std::string dot = WStringToString(L"\u00b7");
-        std::string colon = WStringToString(L"\uff1a");
+        std::string setEffectStr = WStringToString(L"%d 件套效果："); // %d 件套效果：
+        std::string dot = WStringToString(L"·");
+        std::string colon = WStringToString(L"：");
 
         for (const auto& eff : g_SetPanelData.effects) {
             ImVec4 headerColor = eff.isActive
@@ -617,6 +715,7 @@ void DrawSetItemImGui() {
             }
         }
 
+        s_lastWindowHeight = ImGui::GetWindowHeight();
         ImGui::End();
     }
     
