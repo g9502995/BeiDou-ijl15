@@ -85,6 +85,8 @@ struct SetPanelData {
     int nativeX;
     int nativeY;
     int nativeWidth;
+    int anchorX;
+    int anchorY;
     void* pToolTip;
     void* pEquip;
     float drawX;

@@ -367,16 +367,37 @@ void UpdateSetPanelData(void* pToolTip, void* pEquip) {
     int nativeWidth = 236;
 
     if (pToolTip) {
-        int extX = *reinterpret_cast<int*>(reinterpret_cast<char*>(pToolTip) + 0x14);
-        int extY = *reinterpret_cast<int*>(reinterpret_cast<char*>(pToolTip) + 0x18);
-        int extRight = *reinterpret_cast<int*>(reinterpret_cast<char*>(pToolTip) + 0x1C);
+        // Calculate absolute position by traversing CWnd parent hierarchy
+        int absX = 0;
+        int absY = 0;
+        void* curr = pToolTip;
+        int depth = 0;
         
-        // Sanity check coordinates to prevent flying off screen (e.g. from broadcast tooltips which have different memory layout)
-        if (extX >= -500 && extX <= 4000 && extY >= -500 && extY <= 4000) {
-            nativeX = extX;
-            nativeY = extY;
+        while (curr != nullptr && depth < 10) {
+            // Read local X and Y
+            int localX = *reinterpret_cast<int*>(reinterpret_cast<char*>(curr) + 0x14);
+            int localY = *reinterpret_cast<int*>(reinterpret_cast<char*>(curr) + 0x18);
             
-            int calculatedWidth = extRight - extX;
+            // Avoid adding garbage if a parent is somehow invalid
+            if (localX > -5000 && localX < 5000 && localY > -5000 && localY < 5000) {
+                absX += localX;
+                absY += localY;
+            }
+            
+            // Move to parent (CWnd* m_pParent is at 0x04)
+            curr = *reinterpret_cast<void**>(reinterpret_cast<char*>(curr) + 0x04);
+            depth++;
+        }
+
+        int localRight = *reinterpret_cast<int*>(reinterpret_cast<char*>(pToolTip) + 0x1C);
+        int localLeft = *reinterpret_cast<int*>(reinterpret_cast<char*>(pToolTip) + 0x14);
+        
+        // Sanity check coordinates
+        if (absX >= -500 && absX <= 4000 && absY >= -500 && absY <= 4000) {
+            nativeX = absX;
+            nativeY = absY;
+            
+            int calculatedWidth = localRight - localLeft;
             if (calculatedWidth >= 150 && calculatedWidth <= 600) {
                 nativeWidth = calculatedWidth;
             } else {
@@ -397,6 +418,13 @@ void UpdateSetPanelData(void* pToolTip, void* pEquip) {
                 return;
             }
         }
+    }
+
+    if (!g_SetPanelData.active || g_SetPanelData.pToolTip != pToolTip) {
+        POINT pt;
+        GetCursorPos(&pt);
+        g_SetPanelData.startMouseX = (float)pt.x;
+        g_SetPanelData.startMouseY = (float)pt.y;
     }
 
     g_SetPanelData.pToolTip = pToolTip;
@@ -486,31 +514,33 @@ void DrawSetItemImGui() {
     if (g_SetPanelData.nativeX != -1 && g_SetPanelData.nativeY != -1) {
         // Expand outward from mouse cursor
         float nativeCenterX = g_SetPanelData.nativeX + (g_SetPanelData.nativeWidth * 0.5f);
+        const float TOOLTIP_MARGIN_X = 13.0f; // Native tooltip border/shadow padding
+        
         if (nativeCenterX < mousePos.x) {
             // Native tooltip is on the left of the mouse, so place our panel on its LEFT side
-            finalX = (float)(g_SetPanelData.nativeX - myWidth);
+            finalX = (float)(g_SetPanelData.nativeX - TOOLTIP_MARGIN_X - myWidth);
             // If it goes off-screen to the left, try right side as fallback
             if (finalX < 0) {
-                finalX = (float)(g_SetPanelData.nativeX + g_SetPanelData.nativeWidth);
+                finalX = (float)(g_SetPanelData.nativeX + g_SetPanelData.nativeWidth + TOOLTIP_MARGIN_X);
             }
         } else {
             // Native tooltip is on the right of the mouse, so place our panel on its RIGHT side
-            finalX = (float)(g_SetPanelData.nativeX + g_SetPanelData.nativeWidth);
+            finalX = (float)(g_SetPanelData.nativeX + g_SetPanelData.nativeWidth + TOOLTIP_MARGIN_X);
             // If it goes off-screen to the right, try left side as fallback
             if (finalX + myWidth > screenW) {
-                finalX = (float)(g_SetPanelData.nativeX - myWidth);
+                finalX = (float)(g_SetPanelData.nativeX - TOOLTIP_MARGIN_X - myWidth);
             }
         }
         
         // Perfect top alignment
         finalY = (float)g_SetPanelData.nativeY;
     } else {
-        // Fallback if extraction failed
-        finalX = mousePos.x - myWidth - 10.0f;
+        // Fallback if extraction failed - stick to the initial mouse position, do not follow the mouse!
+        finalX = g_SetPanelData.startMouseX - myWidth - 10.0f;
         if (finalX < 0) {
-            finalX = mousePos.x + 20.0f;
+            finalX = g_SetPanelData.startMouseX + 20.0f;
         }
-        finalY = mousePos.y + 12.0f;
+        finalY = g_SetPanelData.startMouseY + 12.0f;
     }
 
     ImGui::SetNextWindowPos(ImVec2(finalX, finalY), ImGuiCond_Always);
