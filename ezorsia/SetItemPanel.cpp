@@ -667,7 +667,7 @@ void DrawSetItemImGui() {
         ImGui::Dummy(ImVec2(0, 4));
 
         for (const auto& item : g_SetPanelData.items) {
-            ImVec4 color = item.isEquipped ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f) : ImVec4(0.80f, 0.80f, 0.80f, 1.0f);
+            ImVec4 color = item.isEquipped ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f) : ImVec4(0.60f, 0.60f, 0.60f, 1.0f);
             
             std::string itemName = item.name;
             std::string catText = "(" + item.category + ")";
@@ -697,7 +697,7 @@ void DrawSetItemImGui() {
         for (const auto& eff : g_SetPanelData.effects) {
             ImVec4 headerColor = eff.isActive
                 ? ImVec4(0.2f, 1.0f, 0.2f, 1.0f) // Bright green
-                : ImVec4(0.80f, 0.80f, 0.80f, 1.0f);
+                : ImVec4(0.60f, 0.60f, 0.60f, 1.0f);
 
             char buf[128];
             snprintf(buf, sizeof(buf), setEffectStr.c_str(), eff.count);
@@ -705,7 +705,7 @@ void DrawSetItemImGui() {
 
             ImVec4 statColor = eff.isActive
                 ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f) // White
-                : ImVec4(0.80f, 0.80f, 0.80f, 1.0f);
+                : ImVec4(0.60f, 0.60f, 0.60f, 1.0f);
 
             for (const auto& stat : eff.stats) {
                 char statBuf[128];
