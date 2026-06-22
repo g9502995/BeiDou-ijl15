@@ -517,6 +517,10 @@ void ClearSetPanelData(void* pToolTip) {
 
 void DrawTextWithShadow(const char* text, ImVec4 color, bool bold = false) {
     ImVec2 pos = ImGui::GetCursorScreenPos();
+    pos.x = (float)(int)(pos.x + 0.5f);
+    pos.y = (float)(int)(pos.y + 0.5f);
+    ImGui::SetCursorScreenPos(pos);
+
     // Draw the shadow manually via draw list
     ImGui::GetWindowDrawList()->AddText(ImVec2(pos.x + 1, pos.y + 1), IM_COL32(0, 0, 0, 255), text);
     if (bold) {
@@ -647,6 +651,10 @@ void DrawSetItemImGui() {
         finalY = screenH - myHeight;
         if (finalY < 0) finalY = 0;
     }
+
+    // Round to nearest integer to avoid sub-pixel blurriness
+    finalX = (float)(int)(finalX + 0.5f);
+    finalY = (float)(int)(finalY + 0.5f);
 
     ImGui::SetNextWindowPos(ImVec2(finalX, finalY), ImGuiCond_Always);
     ImGui::SetNextWindowSizeConstraints(ImVec2(260, 0), ImVec2(400, 600));
