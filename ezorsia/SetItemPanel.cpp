@@ -667,7 +667,7 @@ void DrawSetItemImGui() {
         ImGui::Dummy(ImVec2(0, 4));
 
         for (const auto& item : g_SetPanelData.items) {
-            ImVec4 color = item.isEquipped ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f) : ImVec4(0.50f, 0.55f, 0.55f, 0.7f);
+            ImVec4 color = item.isEquipped ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f) : ImVec4(0.65f, 0.65f, 0.65f, 1.0f);
             
             std::string itemName = item.name;
             std::string catText = "(" + item.category + ")";
