@@ -691,9 +691,9 @@ HRESULT STDMETHODCALLTYPE Direct3DDevice8::EndScene()
 		fontConfig.OversampleV = 1;
 		fontConfig.PixelSnapH = true;
 
-		ImFont* font = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\msyh.ttc", 12.0f, &fontConfig, io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
+		ImFont* font = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\msyh.ttc", 14.0f, &fontConfig, io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
 		if (!font) {
-			io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\simsun.ttc", 12.0f, &fontConfig, io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
+			io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\simsun.ttc", 14.0f, &fontConfig, io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
 		}
 
 		ImGui_ImplWin32_Init(p.hFocusWindow);

@@ -592,7 +592,7 @@ void DrawSetItemImGui() {
     float screenW = ImGui::GetIO().DisplaySize.x;
     float screenH = ImGui::GetIO().DisplaySize.y;
 
-    float myWidth = 260.0f;
+    float myWidth = 300.0f;
     float finalX = 0;
     float finalY = 0;
     
@@ -657,7 +657,7 @@ void DrawSetItemImGui() {
     finalY = (float)(int)(finalY + 0.5f);
 
     ImGui::SetNextWindowPos(ImVec2(finalX, finalY), ImGuiCond_Always);
-    ImGui::SetNextWindowSizeConstraints(ImVec2(260, 0), ImVec2(400, 600));
+    ImGui::SetNextWindowSizeConstraints(ImVec2(myWidth, 0), ImVec2(500, 800));
 
     // Style parameters matching MapleStory native tooltip
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.00f, 0.00f, 0.10f, 0.75f));
@@ -692,7 +692,7 @@ void DrawSetItemImGui() {
             float catWidth = ImGui::CalcTextSize(catText.c_str()).x;
             ImGui::SameLine();
             // Prevent bounds expansion by setting cursor directly rather than using SameLine with an offset
-            float targetX = 260.0f - catWidth - 8.0f; // Window width - cat width - padding
+            float targetX = myWidth - catWidth - 8.0f; // Window width - cat width - padding
             if (ImGui::GetCursorPosX() < targetX) {
                 ImGui::SetCursorPosX(targetX);
             }
