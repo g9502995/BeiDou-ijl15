@@ -595,7 +595,7 @@ void DrawSetItemImGui() {
 
         // Expand outward from mouse cursor
         float nativeCenterX = clampedNativeX + (g_SetPanelData.nativeWidth * 0.5f);
-        const float TOOLTIP_MARGIN_X = 13.0f; // Native tooltip border/shadow padding
+        const float TOOLTIP_MARGIN_X = 0.0f; // Native tooltip border/shadow padding
         
         if (nativeCenterX < mousePos.x) {
             // Native tooltip is on the left of the mouse, so place our panel on its LEFT side
@@ -645,8 +645,8 @@ void DrawSetItemImGui() {
     ImGui::SetNextWindowSizeConstraints(ImVec2(260, 0), ImVec2(400, 600));
 
     // Style parameters matching MapleStory native tooltip
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.04f, 0.04f, 0.12f, 0.85f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.40f, 0.40f, 0.50f, 0.80f));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.00f, 0.00f, 0.10f, 0.75f));
+    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.50f, 0.50f, 0.50f, 0.50f));
     
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 8.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 4.0f);
@@ -682,8 +682,8 @@ void DrawSetItemImGui() {
                 ImGui::SetCursorPosX(targetX);
             }
             
-            // Category text is ALWAYS grey to match the screenshot
-            DrawTextWithShadow(catText.c_str(), ImVec4(0.50f, 0.55f, 0.55f, 0.7f));
+            // Draw category text using the same color as the item name
+            DrawTextWithShadow(catText.c_str(), color);
         }
 
         ImGui::Dummy(ImVec2(0, 2));
