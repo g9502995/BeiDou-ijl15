@@ -679,7 +679,7 @@ void DrawSetItemImGui() {
             std::string itemName = item.name;
             std::string catText = "(" + item.category + ")";
             
-            DrawTextWithShadow(itemName.c_str(), color, item.isEquipped);
+            DrawTextWithShadow(itemName.c_str(), color, true);
             
             float catWidth = ImGui::CalcTextSize(catText.c_str()).x;
             ImGui::SameLine();
@@ -690,7 +690,7 @@ void DrawSetItemImGui() {
             }
             
             // Draw category text using the same color as the item name
-            DrawTextWithShadow(catText.c_str(), color, item.isEquipped);
+            DrawTextWithShadow(catText.c_str(), color, true);
         }
 
         ImGui::Dummy(ImVec2(0, 2));
@@ -708,7 +708,7 @@ void DrawSetItemImGui() {
 
             char buf[128];
             snprintf(buf, sizeof(buf), setEffectStr.c_str(), eff.count);
-            DrawTextWithShadow(buf, headerColor, eff.isActive);
+            DrawTextWithShadow(buf, headerColor, true);
 
             ImVec4 statColor = eff.isActive
                 ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f) // White
@@ -718,7 +718,7 @@ void DrawSetItemImGui() {
                 char statBuf[128];
                 // Format: "· 力量 : +3"
                 snprintf(statBuf, sizeof(statBuf), "%s %s : +%d", dot.c_str(), stat.first.c_str(), stat.second);
-                DrawTextWithShadow(statBuf, statColor, eff.isActive);
+                DrawTextWithShadow(statBuf, statColor, true);
             }
         }
 
