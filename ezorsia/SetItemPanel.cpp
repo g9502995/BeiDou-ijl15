@@ -515,11 +515,18 @@ void ClearSetPanelData(void* pToolTip) {
     // No-op. We rely on the 0x1C visibility check in DrawSetItemImGui.
 }
 
-void DrawTextWithShadow(const char* text, ImVec4 color) {
+void DrawTextWithShadow(const char* text, ImVec4 color, bool bold = false) {
     ImVec2 pos = ImGui::GetCursorScreenPos();
     // Draw the shadow manually via draw list
     ImGui::GetWindowDrawList()->AddText(ImVec2(pos.x + 1, pos.y + 1), IM_COL32(0, 0, 0, 255), text);
+    if (bold) {
+        ImGui::GetWindowDrawList()->AddText(ImVec2(pos.x + 2, pos.y + 1), IM_COL32(0, 0, 0, 255), text);
+    }
     // Draw the actual text using ImGui so it handles cursor layout and boundaries
+    if (bold) {
+        // Draw the text itself at an offset to simulate bolding
+        ImGui::GetWindowDrawList()->AddText(ImVec2(pos.x + 1, pos.y), ImGui::GetColorU32(color), text);
+    }
     ImGui::TextColored(color, "%s", text);
 }
 
@@ -662,7 +669,7 @@ void DrawSetItemImGui() {
         // Center the title
         float titleWidth = ImGui::CalcTextSize(g_SetPanelData.setName.c_str()).x;
         ImGui::SetCursorPosX((ImGui::GetWindowWidth() - titleWidth) * 0.5f);
-        DrawTextWithShadow(g_SetPanelData.setName.c_str(), titleColor);
+        DrawTextWithShadow(g_SetPanelData.setName.c_str(), titleColor, true);
 
         ImGui::Dummy(ImVec2(0, 4));
 
@@ -672,7 +679,7 @@ void DrawSetItemImGui() {
             std::string itemName = item.name;
             std::string catText = "(" + item.category + ")";
             
-            DrawTextWithShadow(itemName.c_str(), color);
+            DrawTextWithShadow(itemName.c_str(), color, item.isEquipped);
             
             float catWidth = ImGui::CalcTextSize(catText.c_str()).x;
             ImGui::SameLine();
@@ -683,7 +690,7 @@ void DrawSetItemImGui() {
             }
             
             // Draw category text using the same color as the item name
-            DrawTextWithShadow(catText.c_str(), color);
+            DrawTextWithShadow(catText.c_str(), color, item.isEquipped);
         }
 
         ImGui::Dummy(ImVec2(0, 2));
@@ -701,7 +708,7 @@ void DrawSetItemImGui() {
 
             char buf[128];
             snprintf(buf, sizeof(buf), setEffectStr.c_str(), eff.count);
-            DrawTextWithShadow(buf, headerColor);
+            DrawTextWithShadow(buf, headerColor, eff.isActive);
 
             ImVec4 statColor = eff.isActive
                 ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f) // White
@@ -711,7 +718,7 @@ void DrawSetItemImGui() {
                 char statBuf[128];
                 // Format: "· 力量 : +3"
                 snprintf(statBuf, sizeof(statBuf), "%s %s : +%d", dot.c_str(), stat.first.c_str(), stat.second);
-                DrawTextWithShadow(statBuf, statColor);
+                DrawTextWithShadow(statBuf, statColor, eff.isActive);
             }
         }
 
