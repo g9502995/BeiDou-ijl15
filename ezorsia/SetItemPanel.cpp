@@ -592,7 +592,7 @@ void DrawSetItemImGui() {
     float screenW = ImGui::GetIO().DisplaySize.x;
     float screenH = ImGui::GetIO().DisplaySize.y;
 
-    float myWidth = 300.0f;
+    float myWidth = 340.0f;
     float finalX = 0;
     float finalY = 0;
     
